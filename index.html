@@ -1,71 +1,177 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kalkulator Arbitrage Simple</title>
-  <style>
-    body{font-family:Arial, sans-serif;background:#0f172a;color:#f1f5f9;display:flex;justify-content:center;padding:20px}
-    .box{background:#1e293b;padding:20px;border-radius:10px;max-width:400px;width:100%}
-    h2{text-align:center;margin-bottom:15px}
-    label{display:block;margin:10px 0 4px}
-    input{width:100%;padding:8px;border-radius:6px;border:none;background:#334155;color:#f1f5f9}
-    .result{margin-top:15px;padding:10px;border-radius:6px;background:#0f172a}
-    .result p{margin:6px 0}
-    .profit{color:#22c55e;font-weight:bold}
-    .loss{color:#ef4444;font-weight:bold}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalkulator Arbitrage (Partial Sell)</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#0f172a;color:#e5e7eb;display:flex;justify-content:center;padding:24px}
+  .box{background:#1e293b;max-width:720px;width:100%;border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  h2{margin:0 0 12px;text-align:center}
+  label{display:block;margin:10px 0 6px;color:#cbd5e1}
+  input{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e5e7eb}
+  .grid{display:grid;gap:10px}
+  @media(min-width:720px){.grid{grid-template-columns:1fr 1fr 1fr 1fr}}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  table{width:100%;border-collapse:separate;border-spacing:0 8px;margin-top:8px}
+  th,td{padding:8px 10px}
+  th{font-size:13px;color:#94a3b8;text-align:left}
+  td{background:#0f172a;border:1px solid #334155;border-left:none;border-right:none}
+  td:first-child{border-left:1px solid #334155;border-top-left-radius:8px;border-bottom-left-radius:8px}
+  td:last-child{border-right:1px solid #334155;border-top-right-radius:8px;border-bottom-right-radius:8px}
+  .actions{display:flex;gap:8px;margin-top:8px}
+  button{cursor:pointer;border:1px solid #334155;background:#0f172a;color:#e5e7eb;padding:10px 12px;border-radius:8px}
+  .result{margin-top:14px;padding:12px;border-radius:10px;background:#0f172a;border:1px dashed #334155}
+  .muted{color:#94a3b8}
+  .profit{color:#22c55e;font-weight:600}
+  .loss{color:#ef4444;font-weight:600}
+  .warn{color:#f59e0b}
+  .right{text-align:right}
+</style>
 </head>
 <body>
   <div class="box">
-    <h2>Kalkulator Arbitrage</h2>
-    
-    <label>Jumlah aset (Base)</label>
-    <input type="number" id="amount" value="100">
+    <h2>Kalkulator Arbitrage (Partial Sell)</h2>
 
-    <label>Harga beli (Exchange A)</label>
-    <input type="number" id="buyPrice" value="16000">
+    <div class="row">
+      <div>
+        <label>Jumlah aset (Base)</label>
+        <input id="amount" type="number" value="100">
+      </div>
+      <div>
+        <label>Harga beli (Exchange A)</label>
+        <input id="buyPrice" type="number" value="16000">
+      </div>
+      <div>
+        <label>Fee beli (%)</label>
+        <input id="buyFee" type="number" step="0.01" value="0.10">
+      </div>
+      <div>
+        <label>Fee jual (%)</label>
+        <input id="sellFee" type="number" step="0.01" value="0.10">
+      </div>
+    </div>
 
-    <label>Fee beli (%)</label>
-    <input type="number" id="buyFee" value="0.1" step="0.01">
+    <label style="margin-top:16px">Daftar Jual Parsial (Qty Base & Harga Jual)</label>
+    <div class="actions">
+      <button id="addRow">+ Tambah baris</button>
+      <button id="clearRows">Bersihkan baris</button>
+      <span class="muted" id="soldInfo"></span>
+    </div>
 
-    <label>Harga jual (Exchange B)</label>
-    <input type="number" id="sellPrice" value="16150">
+    <table id="sellTable">
+      <thead>
+        <tr>
+          <th style="width:45%">Qty (Base)</th>
+          <th style="width:45%">Harga Jual (Quote/Base)</th>
+          <th style="width:10%">Aksi</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-    <label>Fee jual (%)</label>
-    <input type="number" id="sellFee" value="0.1" step="0.01">
-
-    <div class="result">
-      <p>Total Modal Beli: <span id="totalBuy">-</span></p>
-      <p>Total Hasil Jual: <span id="totalSell">-</span></p>
-      <p>Profit Bersih: <span id="profit">-</span></p>
-      <p>ROI: <span id="roi">-</span></p>
+    <div class="result" id="resultBox">
+      <div>Modal Beli: <span id="totalBuy">-</span></div>
+      <div>Hasil Jual Kotor: <span id="grossSell">-</span></div>
+      <div>Total Fee (beli+jual): <span id="totalFees">-</span></div>
+      <div>Profit Bersih: <span id="netProfit" class="profit">-</span></div>
+      <div>ROI: <span id="roi">-</span></div>
+      <div>Sisa Qty (belum terjual): <span id="leftover">-</span></div>
+      <div>Fee Beli per Base (IDR/USDT): <span id="feePerBase">-</span></div>
+      <div class="muted" id="warn"></div>
     </div>
   </div>
 
 <script>
-function calc(){
-  const amount = +document.getElementById("amount").value || 0;
-  const buyPrice = +document.getElementById("buyPrice").value || 0;
-  const buyFeePct = (+document.getElementById("buyFee").value || 0)/100;
-  const sellPrice = +document.getElementById("sellPrice").value || 0;
-  const sellFeePct = (+document.getElementById("sellFee").value || 0)/100;
+const fmt = n => (isFinite(n)? n.toLocaleString("id-ID", { maximumFractionDigits: 8 }): "—");
 
-  const totalBuy = amount * buyPrice * (1 + buyFeePct);
-  const totalSell = amount * sellPrice * (1 - sellFeePct);
-  const profit = totalSell - totalBuy;
-  const roi = totalBuy > 0 ? (profit/totalBuy)*100 : 0;
+const el = id => document.getElementById(id);
+const tbody = document.querySelector("#sellTable tbody");
 
-  document.getElementById("totalBuy").textContent = totalBuy.toLocaleString("id-ID")+" IDR";
-  document.getElementById("totalSell").textContent = totalSell.toLocaleString("id-ID")+" IDR";
-  const profitEl = document.getElementById("profit");
-  profitEl.textContent = profit.toLocaleString("id-ID")+" IDR";
-  profitEl.className = profit>=0 ? "profit" : "loss";
-  document.getElementById("roi").textContent = roi.toFixed(2)+" %";
+function addRow(q=50, p=16150){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="number" step="0.00000001" class="qty" value="${q}"></td>
+    <td><input type="number" step="0.00000001" class="price" value="${p}"></td>
+    <td class="right"><button class="del">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelectorAll("input").forEach(i=>i.addEventListener("input", calc));
+  tr.querySelector(".del").addEventListener("click", ()=>{ tr.remove(); calc(); });
+  calc();
 }
 
-document.querySelectorAll("input").forEach(i=>i.addEventListener("input",calc));
-calc();
+function readRows(){
+  const rows = [];
+  tbody.querySelectorAll("tr").forEach(tr=>{
+    const q = +tr.querySelector(".qty").value || 0;
+    const p = +tr.querySelector(".price").value || 0;
+    if(q>0 && p>0) rows.push({q,p});
+  });
+  return rows;
+}
+
+function calc(){
+  const amount = +el("amount").value || 0;
+  const buyPrice = +el("buyPrice").value || 0;
+  const buyFeePct = (+el("buyFee").value || 0)/100;
+  const sellFeePct = (+el("sellFee").value || 0)/100;
+
+  const rows = readRows();
+
+  // validasi qty tidak melebihi amount (hanya sebagai warning, tetap dihitung)
+  const totalQtySell = rows.reduce((s,r)=>s+r.q,0);
+  const leftover = Math.max(amount - totalQtySell, 0);
+
+  // biaya beli
+  const costBuy = amount * buyPrice;
+  const buyFee = costBuy * buyFeePct;
+  const totalBuy = costBuy + buyFee;
+
+  // hasil jual & fee jual (akumulasi per baris)
+  let grossSell = 0, sellFee = 0;
+  rows.forEach(r=>{
+    const lineGross = r.q * r.p;         // kotor per baris
+    grossSell += lineGross;
+    sellFee += lineGross * sellFeePct;   // fee % sama untuk semua baris
+  });
+
+  const totalFees = buyFee + sellFee;
+  const netProfit = grossSell - sellFee - totalBuy;
+  const roi = totalBuy>0 ? (netProfit/totalBuy)*100 : 0;
+  const feePerBase = amount>0 ? buyFee/amount : 0; // IDR per base (mis. per USDT)
+
+  // render
+  el("totalBuy").textContent = fmt(totalBuy) + " IDR";
+  el("grossSell").textContent = fmt(grossSell) + " IDR";
+  el("totalFees").textContent = fmt(totalFees) + " IDR";
+
+  const np = el("netProfit");
+  np.textContent = fmt(netProfit) + " IDR";
+  np.className = netProfit>=0 ? "profit" : "loss";
+
+  el("roi").textContent = isFinite(roi) ? roi.toFixed(2) + " %" : "—";
+  el("leftover").textContent = fmt(leftover) + " (Base)";
+  el("feePerBase").textContent = fmt(feePerBase);
+
+  const warn = el("warn");
+  warn.textContent = "";
+  if (buyPrice<=0) warn.textContent += " Harga beli harus > 0.";
+  if (rows.length===0) warn.textContent += " Tambahkan minimal 1 baris jual.";
+  if (totalQtySell>amount) warn.textContent += " (⚠️ Qty jual melebihi jumlah aset — sisa jadi negatif secara logis.)";
+
+  // info terjual
+  el("soldInfo").textContent = `Terjual: ${fmt(totalQtySell)} / ${fmt(amount)} Base`;
+}
+
+// events
+["amount","buyPrice","buyFee","sellFee"].forEach(id=>el(id).addEventListener("input",calc));
+el("addRow").addEventListener("click",()=>addRow());
+el("clearRows").addEventListener("click",()=>{ tbody.innerHTML=""; calc(); });
+
+// seed dengan 2 baris contoh
+addRow(60,16150);
+addRow(40,16120);
 </script>
 </body>
 </html>
