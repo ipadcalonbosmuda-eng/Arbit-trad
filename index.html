@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kalkulator Profit Arbitrage (dengan opsi fee)</title>
+<style>
+:root{--bg:#0f172a;--panel:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#22c55e;--warn:#f59e0b;--danger:#ef4444;--line:#1f2937}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(170deg,#0b1024,#0b132b);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+header{padding:24px 18px 8px;max-width:980px;margin:auto} h1{margin:0 0 6px;font-size:22px} p.sub{margin:0;color:var(--muted)}
+main{max-width:980px;margin:12px auto 40px;padding:18px} .grid{display:grid;gap:12px} @media(min-width:880px){.grid{grid-template-columns:1.1fr 1fr}}
+.card{background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{margin:2px 0 10px;font-size:16px;color:#c7d2fe}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0a1326;color:var(--text)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px} .row3{display:grid;grid-template-columns:1fr .9fr 1fr;gap:10px}
+.out{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;margin:6px 0}
+.out .k{color:var(--muted);font-size:13px} .out .v{font-weight:600}
+.accent{color:var(--accent)} .warn{color:var(--warn)} .danger{color:var(--danger)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+button{cursor:pointer;border:1px solid var(--line);background:#0a1326;color:var(--text);padding:10px 14px;border-radius:10px}
+.note{font-size:12px;color:var(--muted);margin-top:6px} .muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+.badge{font-size:11px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:#cbd5e1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Kalkulator Profit Arbitrage</h1>
+  <p class="sub">Beli di Exchange A → kirim → jual di Exchange B. Dukungan fee model: %, flat, dan per base unit.</p>
+</header>
+
+<main class="grid">
+  <!-- INPUTS -->
+  <section class="card">
+    <h2>Input</h2>
+
+    <div class="row">
+      <div>
+        <label>Label mata uang (Quote)</label>
+        <input id="cur" value="IDR" />
+      </div>
+      <div>
+        <label>Target ROI % <span class="muted">(opsional)</span></label>
+        <input id="targetRoi" type="number" step="0.01" placeholder="mis. 1.5" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Jumlah aset dibeli (Base)</label>
+        <input id="amount" type="number" step="0.00000001" value="100" />
+      </div>
+      <div>
+        <label>Biaya transfer jaringan (Base)</label>
+        <input id="transferBase" type="number" step="0.00000001" value="0" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Harga beli A (Quote per 1 Base)</label>
+        <input id="buyPrice" type="number" step="0.00000001" value="16000" />
+      </div>
+      <div>
+        <label>Harga jual B (Quote per 1 Base)</label>
+        <input id="sellPrice" type="number" step="0.00000001" value="16150" />
+      </div>
+    </div>
+
+    <!-- BUY FEES -->
+    <div class="card" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h2 style="margin:0;font-size:15px">Fee Beli (Exchange A)</h2>
+        <span class="badge">dihitung saat beli</span>
+      </div>
+      <div class="row3">
+        <div>
+          <label>Model fee</label>
+          <select id="buyFeeMode">
+            <option value="percent">Percent (%)</option>
+            <option value="flat">Flat (Quote)</option>
+            <option value="perbase">Per Base Unit (Quote/Base)</option>
+          </select>
+        </div>
+        <div>
+          <label>Nilai fee</label>
+          <input id="buyFeeVal" type="number" step="0.00000001" value="0.10" />
+        </div>
+        <div>
+          <label>Keterangan</label>
+          <input id="buyFeeHint" value="0.10 %" disabled />
+        </div>
+      </div>
+    </div>
+
+    <!-- SELL FEES -->
+    <div class="card" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h2 style="margin:0;font-size:15px">Fee Jual (Exchange B)</h2>
+        <span class="badge">dihitung saat jual</span>
+      </div>
+      <div class="row3">
+        <div>
+          <label>Model fee</label>
+          <select id="sellFeeMode">
+            <option value="percent">Percent (%)</option>
+            <option value="flat">Flat (Quote)</option>
+            <option value="perbase">Per Base Unit (Quote/Base)</option>
+          </select>
+        </div>
+        <div>
+          <label>Nilai fee</label>
+          <input id="sellFeeVal" type="number" step="0.00000001" value="0.10" />
+        </div>
+        <div>
+          <label>Keterangan</label>
+          <input id="sellFeeHint" value="0.10 %" disabled />
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Slippage / selisih eksekusi % (opsional)</label>
+        <input id="slipPct" type="number" step="0.01" value="0" />
+      </div>
+      <div>
+        <label>Biaya tetap lain (Quote) <span class="muted">withdraw fiat, biaya platform, dll</span></label>
+        <input id="extraFixed" type="number" step="0.00000001" value="0" />
+      </div>
+    </div>
+
+    <div class="foot">
+      <button id="presetCEX">Preset: CEX umum (0.1%/0.1%)</button>
+      <button id="presetPerBase">Preset: Per Base (Rp 52/USDT)</button>
+      <button id="reset">Reset</button>
+    </div>
+
+    <p class="note">
+      “Biaya transfer jaringan (Base)” mengurangi kuantitas yang tiba di B. Jika <span class="mono">amount - transfer</span> ≤ 0, transaksi tidak valid.
+    </p>
+  </section>
+
+  <!-- OUTPUTS -->
+  <section class="card">
+    <h2>Hasil</h2>
+
+    <div class="out"><span class="k">Biaya beli (termasuk fee beli + biaya tetap)</span><span class="v" id="costFull">–</span></div>
+    <div class="out"><span class="k">Kuantitas tiba di B (setelah transfer)</span><span class="v" id="qtyArrive">–</span></div>
+    <div class="out"><span class="k">Proyeksi hasil jual kotor (pakai harga efektif)</span><span class="v" id="grossSell">–</span></div>
+    <div class="out"><span class="k">Total fee & biaya</span><span class="v" id="totalFees">–</span></div>
+    <div class="out"><span class="k">Profit bersih</span><span class="v accent" id="netProfit">–</span></div>
+    <div class="out"><span class="k">ROI %</span><span class="v" id="roiPct">–</span></div>
+    <div class="out"><span class="k">Break-even harga jual</span><span class="v" id="breakeven">–</span></div>
+    <div class="out"><span class="k">Harga jual untuk capai Target ROI</span><span class="v" id="priceForTarget">–</span></div>
+
+    <p class="note" id="warn" style="display:none"></p>
+  </section>
+</main>
+
+<script>
+const idfmt=(n,max=8)=>new Intl.NumberFormat('id-ID',{maximumFractionDigits:max}).format(n??0);
+const el=id=>document.getElementById(id);
+const inputs=['cur','amount','transferBase','buyPrice','sellPrice','slipPct','extraFixed','targetRoi','buyFeeMode','buyFeeVal','sellFeeMode','sellFeeVal'].map(el);
+
+function feeBuyQuote(amountBase, buyPrice, mode, val){
+  // kembalikan fee dalam Quote
+  if(mode==='percent'){ return (amountBase*buyPrice) * ( (val||0)/100 ); }
+  if(mode==='flat'){ return +val||0; }
+  // per base unit (quote per 1 base)
+  return (amountBase) * (+val||0);
+}
+function feeSellQuote(qtyBase, sellPriceEff, mode, val){
+  if(mode==='percent'){ return (qtyBase*sellPriceEff) * ( (val||0)/100 ); }
+  if(mode==='flat'){ return +val||0; }
+  return (qtyBase) * (+val||0);
+}
+
+function syncHints(){
+  const cur=el('cur').value||'IDR';
+  const bfMode=el('buyFeeMode').value, bfVal=+el('buyFeeVal').value||0;
+  const sfMode=el('sellFeeMode').value, sfVal=+el('sellFeeVal').value||0;
+  el('buyFeeHint').value = bfMode==='percent' ? (bfVal+' %') : bfMode==='flat' ? (idfmt(bfVal)+' '+cur) : (idfmt(bfVal)+' '+cur+'/Base');
+  el('sellFeeHint').value = sfMode==='percent' ? (sfVal+' %') : sfMode==='flat' ? (idfmt(sfVal)+' '+cur) : (idfmt(sfVal)+' '+cur+'/Base');
+}
+
+function calc(){
+  const cur=el('cur').value||'IDR';
+  const amount=+el('amount').value||0;
+  const transferBase=+el('transferBase').value||0;
+  const buyPrice=+el('buyPrice').value||0;
+  const sellPriceInput=+el('sellPrice').value||0;
+  const slipPct=(+el('slipPct').value||0)/100;
+  const extraFixed=+el('extraFixed').value||0;
+  const targetRoi=(+el('targetRoi').value||0)/100;
+
+  const buyFeeMode=el('buyFeeMode').value, buyFeeVal=+el('buyFeeVal').value||0;
+  const sellFeeMode=el('sellFeeMode').value, sellFeeVal=+el('sellFeeVal').value||0;
+
+  syncHints();
+
+  const qtyArriveBase = amount - transferBase;
+  let warning='';
+  if(qtyArriveBase<=0) warning='Jumlah tiba ≤ 0. Kurangi biaya transfer atau tambah amount.';
+  if(buyPrice<=0) warning=(warning?warning+' ':'')+'Harga beli harus > 0.';
+  if(sellPriceInput<=0) warning=(warning?warning+' ':'')+'Harga jual harus > 0.';
+
+  // biaya beli
+  const costBuy = amount * buyPrice;                          // Quote
+  const buyFee = feeBuyQuote(amount, buyPrice, buyFeeMode, buyFeeVal); // Quote
+  const costFull = costBuy + buyFee + extraFixed;             // Quote
+
+  // harga jual efektif (slippage)
+  const sellPriceEff = sellPriceInput * (1 - slipPct);
+
+  // hasil jual dan fee jual
+  const grossSell = Math.max(qtyArriveBase,0) * sellPriceEff; // Quote
+  const sellFee = feeSellQuote(Math.max(qtyArriveBase,0), sellPriceEff, sellFeeMode, sellFeeVal); // Quote
+
+  const totalFees = buyFee + sellFee + extraFixed;
+  const netProfit = grossSell - sellFee - costFull;
+  const roiPct = costFull>0 ? (netProfit/costFull)*100 : 0;
+
+  // Breakeven: qtyArrive*P*(1 - fee%) - feeFlat - feePerBase*qtyArrive = costFull
+  // Umumkan sebagai: cari P sehingga pendapatan bersih = costFull
+  // Untuk mode campuran, kita tidak bisa closed-form kecuali fee jual percent murni.
+  // Jadi gunakan pendekatan numerik sederhana (bisection) agar akurat.
+  function priceNet(P){
+    const ge = Math.max(qtyArriveBase,0)*P; // kotor
+    const sf = feeSellQuote(Math.max(qtyArriveBase,0), P, sellFeeMode, sellFeeVal);
+    return ge - sf; // pendapatan bersih (Quote)
+  }
+  let breakevenPrice = NaN;
+  if(qtyArriveBase>0){
+    // bisection antara 0 dan 1e12 (aman untuk IDR)
+    let lo=0, hi=Math.max(sellPriceInput*3, 1); // starting guess
+    // naikkan hi sampai priceNet(hi) >= costFull atau cap
+    let guard=0;
+    while(priceNet(hi)<costFull && hi<1e12 && guard<100){hi*=2;guard++;}
+    if(priceNet(hi)>=costFull){
+      for(let i=0;i<60;i++){
+        const mid=(lo+hi)/2;
+        if(priceNet(mid)>=costFull) hi=mid; else lo=mid;
+      }
+      breakevenPrice=hi;
+    }
+  }
+
+  let priceForTarget = NaN;
+  if(qtyArriveBase>0 && targetRoi>0){
+    const need = costFull*(1+targetRoi);
+    // bisection lagi menuju need
+    let lo=0, hi=Math.max(sellPriceInput*3, 1), guard=0;
+    while(priceNet(hi)<need && hi<1e12 && guard<100){hi*=2;guard++;}
+    if(priceNet(hi)>=need){
+      for(let i=0;i<60;i++){
+        const mid=(lo+hi)/2;
+        if(priceNet(mid)>=need) hi=mid; else lo=mid;
+      }
+      priceForTarget=hi;
+    }
+  }
+
+  // render
+  el('costFull').textContent   = idfmt(costFull,8)+' '+cur;
+  el('qtyArrive').textContent  = idfmt(qtyArriveBase,8)+' (Base)';
+  el('grossSell').textContent  = idfmt(grossSell,8)+' '+cur;
+  el('totalFees').textContent  = idfmt(totalFees,8)+' '+cur;
+
+  const np=el('netProfit'); np.textContent=idfmt(netProfit,8)+' '+cur;
+  np.classList.remove('accent','warn','danger');
+  np.classList.add(netProfit>0?'accent':(netProfit===0?'warn':'danger'));
+
+  el('roiPct').textContent = (isFinite(roiPct)? idfmt(roiPct,4):'–')+' %';
+  el('breakeven').textContent = isFinite(breakevenPrice)? (idfmt(breakevenPrice,8)+' '+cur):'–';
+  el('priceForTarget').textContent = isFinite(priceForTarget)? (idfmt(priceForTarget,8)+' '+cur):'—';
+
+  const warn=el('warn');
+  if(warning){ warn.style.display='block'; warn.textContent='⚠️ '+warning; }
+  else { warn.style.display='none'; warn.textContent=''; }
+}
+
+// presets
+el('presetCEX').addEventListener('click',()=>{
+  el('buyFeeMode').value='percent'; el('buyFeeVal').value=0.10;
+  el('sellFeeMode').value='percent'; el('sellFeeVal').value=0.10;
+  el('extraFixed').value=0; el('slipPct').value=0;
+  calc();
+});
+el('presetPerBase').addEventListener('click',()=>{
+  el('buyFeeMode').value='perbase'; el('buyFeeVal').value=52;   // Rp 52 per 1 Base
+  el('sellFeeMode').value='perbase'; el('sellFeeVal').value=52; // Rp 52 per 1 Base
+  el('cur').value='IDR';
+  calc();
+});
+el('reset').addEventListener('click',()=>{
+  el('cur').value='IDR';
+  el('amount').value=100; el('transferBase').value=0;
+  el('buyPrice').value=16000; el('sellPrice').value=16150;
+  el('buyFeeMode').value='percent'; el('buyFeeVal').value=0.10;
+  el('sellFeeMode').value='percent'; el('sellFeeVal').value=0.10;
+  el('slipPct').value=0; el('extraFixed').value=0; el('targetRoi').value='';
+  calc();
+});
+
+inputs.forEach(i=>i.addEventListener('input',calc));
+calc();
+</script>
+</body>
+</html>
